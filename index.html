@@ -1,0 +1,323 @@
+<!doctype html>
+<html>
+<head>
+	<title>Eugene Makarov</title>
+	<meta charset='utf-8'>
+	<script src="js/react.js"></script>
+	<script src="js/react-dom.js"></script>
+	<script src="js/browser.min.js"></script>
+	<script src="js/jquery.min.js"></script>	
+	<script src="js/McFly.js"></script>	
+	<link rel='stylesheet', href='css/bootstrap.min.css'>
+	<link href='https://fonts.googleapis.com/css?family=Merriweather:400italic' rel='stylesheet' type='text/css'>
+	<link rel='stylesheet', href='css/main.css'>
+
+</head>
+<body>
+	<main id="content"></main>
+
+	<script type="text/babel">
+
+		/*
+		Column of filterable/removable items with a title
+
+		methods:
+		- removeItem, calls Main's method handleRemoveItem
+
+		renders:
+		-ul of li elements (filtering data and sorting by column number)
+
+		rendered by Main
+		*/
+		var Column = React.createClass({
+			removeItem: function(index){
+				this.props.handleRemoveItem(index);
+			},
+			render: function(){
+				var colNum 		= this.props.colNum;	
+				var filterValue = this.props.filterItems;
+				var self	    = this;
+
+				return (
+					<div className="column col-md-6 padding">
+						<div className="columnTitle text-center">
+							<h7>COLUMN {colNum}</h7>
+						</div>
+						<ul colNum={colNum} className="list-group" >
+							{/*
+							.map() used to sort items by columns, by search filter and to create li elements 
+							*/}
+							{ this.props.data
+								.map(function(item, index){ // return elements of array as li 
+									if (item.column === colNum &&
+										item.description.toLowerCase().indexOf(filterValue.toLowerCase()) > -1) 
+									{
+										return <li key={index} className="list-group-item"> {item.description}
+										<span className="pointer pull-right" onClick={self.removeItem.bind(null,index)}> &#x274c; </span>
+										 </li>
+									}
+								})
+							}
+						</ul>
+					</div>
+				);
+			}
+		});
+
+		/*
+		AddItemBar
+
+		methods:
+		 -handleAddItem calls Main's method handleAddItem (passed through ActionsBox) 
+
+		renders:
+		-form wtih input text field, dropbox and submit button
+
+		rendered by ActionBox
+		*/
+		var AddItemBar = React.createClass({
+			handleAddItem: function(e){
+				e.preventDefault();
+				var text = this.refs.text.value.trim();
+				var column = parseInt(this.refs.column.value.trim());
+
+				if( !text || !column ){
+					return;
+				}
+
+				this.props.addItem({description: text, column: column});
+				this.refs.text.value = '';
+				this.refs.column.value = '';
+				return;
+
+			},
+			render: function(){
+				return (
+					<form onSubmit={this.handleAddItem} >
+						<input type="text" placeholder="ENTER ITEM" ref="text" />
+						
+						<select ref="column" >
+							<option selected="selected" disabled="disabled"> CHOOSE COLUMN </option>
+							<option value="1">COLUMN 1 </option>
+							<option value="2">COLUMN 2 </option>
+						</select>
+						<input id="addItemBar" type="submit" value="ADD ITEM" />
+					</form>
+				);
+			}
+		});
+
+
+		/*
+		SearchBar
+
+		methods:
+		 -handleChange calls Main's method onFilterChange (passed through ActionsBox)
+
+		renders:
+		 -form with label and input text field
+
+		rendered by ActionsBox 
+		*/
+		var SearchBar = React.createClass({
+			handleChange: function(){
+				this.props.onFilterChange( this.refs.filterValue.value );
+			},
+			render: function(){
+				return (
+					<form id="searchForm">
+						<label for="searchBar">SEARCH AN ITEM</label>
+						<input value={this.props.filterItems} onChange={this.handleChange} type="text" placeholder="SEARCH" ref="filterValue" id="searchBar" />
+					</form>	
+				);
+			}	
+		});
+
+		/*
+		ActionsBox
+		
+		renders:
+		 -AddItemBar
+		 -SearchBar
+
+		rendered by Main
+		*/
+		var ActionsBox = React.createClass({
+			render: function(){
+				return (
+					<div >
+						<AddItemBar addItem={this.props.addItem}/>
+						<SearchBar onFilterChange={this.props.onFilterChange} filterItems={this.props.filterItems}/>
+					</div>
+				);
+			}
+		});
+
+		/*
+		Main components holds the state
+		methods:
+		 -loadItems
+		 -handleAddItem
+		 -handleRemoveItem
+		 -onFilterChange
+		renders:
+		 -ActionsBox
+		 -Column1
+		 -Column2
+
+		 rendered by Container
+		 */
+		var Main = React.createClass({
+			getInitialState: function(){
+				return {
+					data:[],
+					filterItems: ''
+				};
+			},
+			loadItems: function(){
+				$.ajax({
+					url: this.props.url,
+					dataType: 'json',
+					cache: false,
+					success: function(data){
+						this.setState({data: data});
+					}.bind(this),
+					error: function(xhr, status, err){
+						console.error(this.props.url, status, err.toString());
+					}.bind(this)
+				});
+			},
+			componentDidMount: function(){
+				this.loadItems();
+				setInterval(this.loadItems);
+			},
+			handleAddItem: function(item){
+				console.log("here",item);
+				var items = this.state.data;
+				var newItems = items.concat([item]);
+
+				this.setState({data: newItems});
+
+				// $.ajax({
+				// 	url: this.props.url,
+				// 	dataType: 'json',
+				// 	type: 'POST',
+				// 	data: newItems,
+				// 	success: function(data){
+				// 		this.setState({data: data});
+				// 	}.bind(this),
+				// 	error: function(xhr, status, err){
+				// 		console.error(this.props.url, status, err.toString());
+				// 	}.bind(this)
+				// });
+			},
+			handleRemoveItem: function(index){
+				var newItems = this.state.data;
+				newItems.splice(index,1);
+
+				this.setState({data: newItems});
+
+				// $.ajax({
+				// 	url: this.props.url,
+				// 	dataType: 'json',
+				// 	type: 'POST',
+				// 	data: newItems,
+				// 	success: function(data){
+				// 		this.setState({data: data});
+				// 	}.bind(this),
+				// 	error: function(xhr, status, err){
+				// 		console.error(this.props.url, status, err.toString());
+				// 	}.bind(this)
+				// });			
+			},
+			onFilterChange: function(filterValue){
+				this.setState({filterItems: filterValue});
+			},
+			render: function(){
+				return (
+					<div className="main">
+						<div className="actionBox col-md-4 border padding-left">
+							<ActionsBox onFilterChange={this.onFilterChange} filterItems={this.state.filterItems} addItem={this.handleAddItem} />
+						</div>
+						<div className="col-md-8 border">
+							<div className="columns row">
+								<Column 
+									colNum={1} 
+									handleRemoveItem={this.handleRemoveItem} 
+									filterItems={this.state.filterItems} 
+									data={this.state.data} />	
+								<Column 
+								colNum={2} 
+								handleRemoveItem={this.handleRemoveItem} 
+								filterItems={this.state.filterItems} 
+								data={this.state.data} />
+							</div>
+						</div>
+					</div>
+				);
+			}
+		});
+
+		/*
+		Header
+
+		renders:
+		 -main title
+		 -lorem ipsum
+
+		rendered by Container
+		*/
+		var Header = React.createClass({
+			render: function(){
+				return (
+					<header className="col-md-8 padding">
+						<h1>Marvelous!</h1>
+						<p>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry&#39;s standard dummy text ever since.</p>
+					</header>		
+				);
+			}
+		});
+
+		/*
+		Container
+
+		renders
+		 -div container where all content is hold
+		 -Header
+		 -"Add an item" sign
+		 -Main
+
+
+		rendered by ReactDOM
+		*/
+		var Container = React.createClass({
+			render: function(){
+				return (
+					<div className="container">
+						<div className="row">
+							<div className="col-md-10 col-md-offset-1">
+								<div className="row">
+									<Header />	
+									<div className="col-md-12 padding">
+										<div className="buttonLikeSign text-center"> 
+											<h4> ADD AN ITEM </h4>
+										</div>
+									</div>	
+									<Main url={this.props.url}  />
+								</div>
+							</div>
+						</div>
+					</div>
+				);
+			}
+		});
+		
+		ReactDOM.render(
+			<Container url="items.json" />, 
+			document.getElementById("content")
+		);
+
+	</script> 
+
+</body>
+</html>
